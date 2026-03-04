@@ -19,6 +19,12 @@ public class TransactionService {
     @Autowired
     private TransactionRepository repository;
 
+    @Autowired
+    private AuthorizationService authService;
+
+    @Autowired
+    private NotificationService notificationService;
+
     @Transactional
     public Transaction createTransaction(TransactionDTO transaction) throws Exception {
         User sender = userService.findUserById(transaction.payer());
@@ -26,16 +32,13 @@ public class TransactionService {
 
         userService.validateTransaction(sender, transaction.value());
 
-        boolean isAuthorized = this.authorizeTransaction(sender, transaction.value());
+        boolean isAuthorized = authService.authorize(sender, transaction.value());
         if (!isAuthorized) {
-            throw new Exception("Transação não autorizada");
+            throw new Exception("Transação não autorizada pelo serviço externo");
         }
 
         sender.setBalance(sender.getBalance().subtract(transaction.value()));
         receiver.setBalance(receiver.getBalance().add(transaction.value()));
-
-        userService.saveUser(sender);
-        userService.saveUser(receiver);
 
         Transaction newTransaction = new Transaction();
         newTransaction.setAmount(transaction.value());
@@ -43,13 +46,17 @@ public class TransactionService {
         newTransaction.setReceiver(receiver);
         newTransaction.setTimestamp(LocalDateTime.now());
 
-        return repository.save(newTransaction);
+        userService.saveUser(sender);
+        userService.saveUser(receiver);
+        repository.save(newTransaction);
 
-        // notificationService.sendNotification(sender, "Dinheiro enviado");
-        // notificationService.sendNotification(receiver, "Dinheiro recebido");
-    }
+        try {
+            notificationService.sendNotification(sender, "Transferência realizada com sucesso");
+            notificationService.sendNotification(receiver, "Você recebeu uma nova transferência");
+        } catch (Exception e) {
+            System.err.println("Aviso: Falha ao enviar notificação. " + e.getMessage());
+        }
 
-    public boolean authorizeTransaction(User sender, java.math.BigDecimal value) {
-        return true;
+        return newTransaction;
     }
 }
