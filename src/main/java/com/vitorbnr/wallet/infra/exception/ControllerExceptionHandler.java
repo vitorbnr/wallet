@@ -4,6 +4,7 @@ import com.vitorbnr.wallet.dtos.ExceptionDTO;
 import jakarta.persistence.EntityNotFoundException;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
@@ -25,5 +26,12 @@ public class ControllerExceptionHandler {
     public ResponseEntity<ExceptionDTO> threatGeneralException(Exception exception) {
         ExceptionDTO exceptionDTO = new ExceptionDTO(exception.getMessage(), "500");
         return ResponseEntity.internalServerError().body(exceptionDTO);
+    }
+
+    @ExceptionHandler(MethodArgumentNotValidException.class)
+    public ResponseEntity<ExceptionDTO> threatValidationError(MethodArgumentNotValidException exception) {
+        String errorMessage = exception.getBindingResult().getAllErrors().get(0).getDefaultMessage();
+        ExceptionDTO exceptionDTO = new ExceptionDTO(errorMessage, "400");
+        return ResponseEntity.badRequest().body(exceptionDTO);
     }
 }
